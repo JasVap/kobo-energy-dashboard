@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Stroomprijzen | Kobo test</title>
+<style>
+html,body{margin:0;padding:0;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif}*{box-sizing:border-box}.page{width:100%;max-width:768px;margin:0 auto;padding:22px 20px}.tag{font-size:19px;letter-spacing:2px;border-bottom:3px solid #111;padding-bottom:12px}.heading{font-size:23px;margin-top:25px}.price{font-size:76px;font-weight:bold;line-height:1.25}.unit{font-size:25px}.note{font-size:18px;margin-top:8px}.section{font-size:24px;font-weight:bold;margin:30px 0 10px}.chart{height:255px;border-left:2px solid #111;border-bottom:2px solid #111;position:relative;white-space:nowrap;font-size:0;padding:0 3px}.bar{display:inline-block;vertical-align:bottom;width:4.166%;background:#777;border:1px solid #fff;position:relative}.bar.low{background:#ddd;border-color:#888}.bar.now{background:#111}.axis{font-size:17px;display:flex;justify-content:space-between;margin-top:8px}.box{border:3px solid #111;padding:16px;margin-top:24px}.box strong{font-size:27px}.box p{font-size:20px;margin:8px 0 0}.foot{font-size:16px;margin-top:18px;border-top:1px solid #999;padding-top:12px}@media(max-width:450px){.page{padding:14px 12px}.price{font-size:54px}.chart{height:210px}.heading{font-size:20px}}
+</style>
+</head>
+<body><div class="page">
+<div class="tag">STROOMPRIJZEN · KOBO TEST</div>
+<div class="heading">Actuele prijs (voorbeeld)</div>
+<div class="price">€ 0,23<span class="unit"> /kWh</span></div>
+<div class="note">Vandaag · 18 oktober · 17:00–18:00</div>
+<div class="section">Prijsverloop vandaag</div>
+<div class="chart" id="chart"></div>
+<div class="axis"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+<div class="box"><strong>Goedkoopste 3 uur</strong><p>12:00–15:00 · gemiddeld € 0,15/kWh</p></div>
+<div class="foot">TESTGEGEVENS · Nog niet gekoppeld aan Homey of Tibber.<br>Versie 1 · Test van schermindeling en grafiek.</div>
+</div>
+<script>
+(function(){var v=[31,30,28,26,25,23,24,28,31,29,26,22,16,15,14,17,20,23,29,35,38,34,32,30];var c=document.getElementById('chart');for(var i=0;i<v.length;i++){var b=document.createElement('span');b.className='bar'+(i>=12&&i<=14?' low':'')+(i===17?' now':'');b.style.height=(v[i]/40*100)+'%';b.title=i+':00';c.appendChild(b)}})();
+</script>
+</body></html>
