@@ -1,25 +1,21 @@
-<!DOCTYPE html>
-<html lang="nl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Stroomprijzen | Kobo test</title>
+<!doctype html>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>Tibber | Kobo</title>
 <style>
-html,body{margin:0;padding:0;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif}*{box-sizing:border-box}.page{width:100%;max-width:768px;margin:0 auto;padding:22px 20px}.tag{font-size:19px;letter-spacing:2px;border-bottom:3px solid #111;padding-bottom:12px}.heading{font-size:23px;margin-top:25px}.price{font-size:76px;font-weight:bold;line-height:1.25}.unit{font-size:25px}.note{font-size:18px;margin-top:8px}.section{font-size:24px;font-weight:bold;margin:30px 0 10px}.chart{height:255px;border-left:2px solid #111;border-bottom:2px solid #111;position:relative;white-space:nowrap;font-size:0;padding:0 3px}.bar{display:inline-block;vertical-align:bottom;width:4.166%;background:#777;border:1px solid #fff;position:relative}.bar.low{background:#ddd;border-color:#888}.bar.now{background:#111}.axis{font-size:17px;display:flex;justify-content:space-between;margin-top:8px}.box{border:3px solid #111;padding:16px;margin-top:24px}.box strong{font-size:27px}.box p{font-size:20px;margin:8px 0 0}.foot{font-size:16px;margin-top:18px;border-top:1px solid #999;padding-top:12px}@media(max-width:450px){.page{padding:14px 12px}.price{font-size:54px}.chart{height:210px}.heading{font-size:20px}}
-</style>
-</head>
-<body><div class="page">
-<div class="tag">STROOMPRIJZEN · KOBO TEST</div>
-<div class="heading">Actuele prijs (voorbeeld)</div>
-<div class="price">€ 0,23<span class="unit"> /kWh</span></div>
-<div class="note">Vandaag · 18 oktober · 17:00–18:00</div>
-<div class="section">Prijsverloop vandaag</div>
-<div class="chart" id="chart"></div>
-<div class="axis"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
-<div class="box"><strong>Goedkoopste 3 uur</strong><p>12:00–15:00 · gemiddeld € 0,15/kWh</p></div>
-<div class="foot">TESTGEGEVENS · Nog niet gekoppeld aan Homey of Tibber.<br>Versie 1 · Test van schermindeling en grafiek.</div>
-</div>
+*{box-sizing:border-box}body{margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;background:white;color:#111;max-width:768px}header{border-bottom:3px solid #111;padding-bottom:12px;font-size:23px;letter-spacing:2px}h2{font-size:24px;margin:22px 0 7px}.price{font-size:76px;font-weight:bold;line-height:1.2}.unit{font-size:23px}.sub{font-size:17px;margin-top:6px}.tabs{margin-top:19px}.tabs button{font-size:19px;padding:9px 19px;background:white;color:#111;border:2px solid #111}.tabs button.active{background:#111;color:white}.graph{margin-top:15px;height:280px;border-left:2px solid #111;border-bottom:2px solid #111;position:relative;padding:0 5px 0 7px}.bars{height:100%;display:flex;align-items:flex-end;gap:2px}.bar{flex:1;min-width:0;background:#777}.bar.low{background:#ddd;border:1px solid #999}.bar.now{background:#111}.axis{display:flex;justify-content:space-between;font-size:16px;margin-top:7px}.box{border:3px solid #111;padding:13px;margin-top:28px}.box strong{font-size:23px}.box div{font-size:19px;margin-top:7px}footer{border-top:1px solid #aaa;margin-top:24px;padding-top:10px;font-size:14px}#error{font-size:16px;margin-top:12px} @media(max-width:450px){body{padding:12px}.price{font-size:58px}.graph{height:230px}header{font-size:19px}}
+</style></head><body>
+<header>STROOMPRIJZEN · TIBBER</header>
+<h2>Actuele stroomprijs</h2><div><span class="price" id="price">—</span> <span class="unit">/kWh</span></div><div class="sub" id="currenttime">Gegevens laden…</div>
+<div class="tabs"><button id="btntoday" class="active" onclick="showDay('today')">Vandaag</button><button id="btntomorrow" onclick="showDay('tomorrow')">Morgen</button></div>
+<h2 id="charttitle">Prijsverloop vandaag</h2><div class="graph"><div class="bars" id="bars"></div></div><div class="axis"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+<div class="box"><strong>Goedkoopste 3 uur</strong><div id="cheapest">—</div></div>
+<footer><div id="updated">Bron: Tibber · Tarieven inclusief belastingen en vergoedingen volgens Tibber API.</div><div id="error"></div></footer>
 <script>
-(function(){var v=[31,30,28,26,25,23,24,28,31,29,26,22,16,15,14,17,20,23,29,35,38,34,32,30];var c=document.getElementById('chart');for(var i=0;i<v.length;i++){var b=document.createElement('span');b.className='bar'+(i>=12&&i<=14?' low':'')+(i===17?' now':'');b.style.height=(v[i]/40*100)+'%';b.title=i+':00';c.appendChild(b)}})();
-</script>
-</body></html>
+var dataset=null, selected='today';
+function pad(n){return (n<10?'0':'')+n}
+function clock(s){var m=String(s).match(/T(\d\d):(\d\d)/);return m?m[1]+':'+m[2]:'--:--'}
+function euro(n){return '€ '+Number(n).toFixed(3).replace('.',',')}
+function render(){if(!dataset)return;var a=dataset[selected]||[];document.getElementById('btntoday').className=selected==='today'?'active':'';document.getElementById('btntomorrow').className=selected==='tomorrow'?'active':'';document.getElementById('charttitle').innerHTML='Prijsverloop '+(selected==='today'?'vandaag':'morgen');var now=new Date(),entries=[];for(var i=0;i<a.length;i++){if(typeof a[i].total==='number'&&a[i].startsAt)entries.push(a[i])}var current=null;var all=(dataset.today||[]).concat(dataset.tomorrow||[]);for(i=0;i<all.length;i++){var start=new Date(all[i].startsAt).getTime();var end=i+1<all.length?new Date(all[i+1].startsAt).getTime():start+3600000;if(start<=now.getTime()&&now.getTime()<end)current=all[i]}if(!current&&dataset.current)current=dataset.current;document.getElementById('price').innerHTML=current?euro(current.total):'—';document.getElementById('currenttime').innerHTML=current?'Geldig vanaf '+clock(current.startsAt)+' · '+(current===dataset.current?'Tibber actueel':'Tibber-tarief'):'Geen actueel tarief beschikbaar';var bars=document.getElementById('bars');bars.innerHTML='';if(!entries.length){document.getElementById('cheapest').innerHTML='Nog geen tarieven beschikbaar';return}var max=0,min=999;for(i=0;i<entries.length;i++){max=Math.max(max,entries[i].total);min=Math.min(min,entries[i].total)}var baseline=Math.min(0,min-0.03),range=Math.max(0.01,max-baseline);for(i=0;i<entries.length;i++){var b=document.createElement('div');var height=Math.max(3,Math.round(100*(entries[i].total-baseline)/range));b.className='bar'+(entries[i].total<=min+0.025?' low':'');var st=new Date(entries[i].startsAt).getTime();var en=i+1<entries.length?new Date(entries[i+1].startsAt).getTime():st+3600000;if(selected==='today'&&st<=now.getTime()&&now.getTime()<en)b.className='bar now';b.style.height=height+'%';b.title=clock(entries[i].startsAt)+' '+euro(entries[i].total);bars.appendChild(b)}var best=null;for(i=0;i+2<entries.length;i++){var t0=new Date(entries[i].startsAt).getTime(),t1=new Date(entries[i+1].startsAt).getTime(),t2=new Date(entries[i+2].startsAt).getTime();if(t1-t0!==3600000||t2-t1!==3600000)continue;var avg=(entries[i].total+entries[i+1].total+entries[i+2].total)/3;if(!best||avg<best.avg)best={i:i,avg:avg}}if(best){var finish=new Date(new Date(entries[best.i+2].startsAt).getTime()+3600000);var endclock=pad(finish.getHours())+':'+pad(finish.getMinutes());document.getElementById('cheapest').innerHTML=clock(entries[best.i].startsAt)+'–'+endclock+' · gemiddeld '+euro(best.avg)+'/kWh'}else document.getElementById('cheapest').innerHTML='Geen volledige periode beschikbaar'}
+function showDay(day){selected=day;render()}
+function load(){var x=new XMLHttpRequest();x.open('GET','prices.json?t='+new Date().getTime(),true);x.onreadystatechange=function(){if(x.readyState===4){if(x.status===200||x.status===0){try{var d=JSON.parse(x.responseText);if(!d.today||!d.tomorrow)throw Error('Onbekend gegevensformaat');dataset=d;document.getElementById('error').innerHTML='';render();document.getElementById('updated').innerHTML='Bron: Tibber · Laatst opgehaald '+pad(new Date().getHours())+':'+pad(new Date().getMinutes())+' · Inclusief belastingen en vergoedingen.'}catch(e){document.getElementById('error').innerHTML='Kan prijsgegevens niet verwerken: '+e.message}}else document.getElementById('error').innerHTML='Kan prices.json niet laden (HTTP '+x.status+').'}};x.send()}
+load();setInterval(load,15*60*1000);setInterval(render,60*1000);
+</script></body></html>
