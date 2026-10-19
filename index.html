@@ -1,16 +1,15 @@
 <!doctype html>
 <html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>Tibber | Kobo</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;padding:0}body{padding:8px 11px;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;width:100%;max-width:768px;overflow-x:hidden}header{border-bottom:2px solid #111;padding-bottom:4px;font-size:15px;letter-spacing:1px}h2{font-size:17px;margin:8px 0 3px}.price{font-size:49px;font-weight:bold;line-height:1.05}.unit{font-size:16px}.sub,.hint{font-size:12px;margin-top:3px}.graph{margin-top:6px;height:205px;border-left:2px solid #111;border-bottom:2px solid #111;position:relative;overflow:hidden}.bars{position:absolute;top:0;bottom:0;left:0;right:0}.bar{position:absolute;bottom:0;background:#777;border:1px solid #fff}.bar.low{background:#ddd;border:1px solid #888}.bar.now{background:#111}.value{position:absolute;font-size:11px;font-weight:bold;text-align:center;white-space:nowrap}.gridline{position:absolute;left:0;right:0;border-top:1px dashed #aaa}.gridline span{position:absolute;right:0;top:-13px;font-size:10px;background:#fff}.axis{position:relative;height:17px;font-size:11px;margin-top:3px}.tick{position:absolute;top:0}.box{border:2px solid #111;padding:7px;margin-top:8px}.box strong{font-size:16px}.box div{font-size:15px;margin-top:3px}footer{border-top:1px solid #aaa;margin-top:8px;padding-top:4px;font-size:10px}#error{font-size:12px;margin-top:4px}
-/* Keep all content on one Kobo screen, including the browser toolbar. */
-@media (max-height:800px){.graph{height:180px}.price{font-size:43px}h2{margin-top:6px}.box{margin-top:6px}footer{margin-top:5px}}
-@media (max-height:650px){.graph{height:145px}.price{font-size:38px}.hint{display:none}footer{font-size:9px}}
+*{box-sizing:border-box}html,body{margin:0;padding:0}body{padding:3px 7px;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;width:100%;max-width:768px;overflow-x:hidden}header{display:none}h2{font-size:15px;margin:3px 0 1px}.price{font-size:39px;font-weight:bold;line-height:1.05}.unit{font-size:16px}.sub,.hint{font-size:10px;margin-top:1px}.graph{margin-top:3px;height:165px;border-left:2px solid #111;border-bottom:2px solid #111;position:relative;overflow:hidden}.bars{position:absolute;top:0;bottom:0;left:0;right:0}.bar{position:absolute;bottom:0;background:#777;border:1px solid #fff}.bar.low{background:#ddd;border:1px solid #888}.bar.now{background:#111}.value{position:absolute;font-size:11px;font-weight:bold;text-align:center;white-space:nowrap}.gridline{position:absolute;left:0;right:0;border-top:1px dashed #aaa}.gridline span{position:absolute;right:0;top:-13px;font-size:10px;background:#fff}.axis{position:relative;height:15px;font-size:10px;margin-top:2px}.tick{position:absolute;top:0}.box{min-height:47px;border:2px solid #111;padding:4px;margin-top:3px}.box strong{font-size:13px}.box div{font-size:12px;margin-top:2px}footer{display:none}#error{font-size:12px;margin-top:4px}
+/* Older Kobo browsers may ignore height media queries: JS measures visible space. */
+html,body{overflow:hidden} .value{font-size:10px} .gridline span{font-size:9px}
 </style></head><body>
-<header>STROOMPRIJZEN · TIBBER</header>
-<h2>Actuele stroomprijs</h2><div><span class="price" id="price">—</span> <span class="unit">/kWh</span></div><div class="sub" id="currenttime">Gegevens laden…</div>
 
-<h2 id="charttitle">Komende 24 uur</h2><div class="hint">Tarieven in cent/kWh · huidig uur links</div><div class="graph" id="graph"><div class="bars" id="bars"></div></div><div class="axis" id="axis"></div><div class="hint" id="coverage"></div>
-<div class="box"><strong>Goedkoopste 3 aaneengesloten uren</strong><div id="cheapest">—</div></div>
+<div><span class="price" id="price">—</span> <span class="unit">/kWh</span></div><div class="sub" id="currenttime">Gegevens laden…</div>
+
+<h2 id="charttitle">Komende uren · cent/kWh</h2><div class="graph" id="graph"><div class="bars" id="bars"></div></div><div class="axis" id="axis"></div><div class="hint" id="coverage"></div>
+<div class="box"><strong>Goedkoopste 3 uur</strong><div id="cheapest">—</div></div>
 <footer><div id="updated">Bron: Tibber · Tarieven inclusief belastingen en vergoedingen volgens Tibber API.</div><div id="error"></div></footer>
 <script>
 var dataset=null;
@@ -19,6 +18,15 @@ function clock(s){var m=String(s).match(/T(\d\d):(\d\d)/);return m?m[1]+':'+m[2]
 function euro(n){return '€ '+Number(n).toFixed(3).replace('.',',')}
 function cents(n){return String(Math.round(n*100))}
 function timeLabel(s){var d=new Date(s);return pad(d.getHours())+':'+pad(d.getMinutes())}
+function fitScreen(){
+ var graph=document.getElementById('graph'),box=document.getElementsByClassName('box')[0];
+ var view=window.innerHeight||document.documentElement.clientHeight||600;
+ // Reserve the actual measured space below the chart, including the bottom recommendation.
+ var graphTop=graph.getBoundingClientRect?graph.getBoundingClientRect().top:150;
+ var remaining=box.offsetHeight+document.getElementById('axis').offsetHeight+document.getElementById('coverage').offsetHeight+20;
+ var available=Math.floor(view-graphTop-remaining-12);
+ graph.style.height=Math.max(75,Math.min(240,available))+'px';
+}
 function render(){
  if(!dataset)return;
  var now=new Date(),ms=now.getTime(),all=(dataset.today||[]).concat(dataset.tomorrow||[]),valid=[],i;
@@ -34,6 +42,7 @@ function render(){
  if(!current&&dataset.current){var cs=new Date(dataset.current.startsAt).getTime();if(cs<=ms&&ms<cs+3600000)current=dataset.current}
  document.getElementById('price').innerHTML=current?euro(current.total):'—';
  document.getElementById('currenttime').innerHTML=current?'Huidig uur '+clock(current.startsAt)+'–'+pad(new Date(new Date(current.startsAt).getTime()+3600000).getHours())+':00'+' · inclusief belastingen':'Geen actueel tarief beschikbaar';
+ fitScreen();
  var bars=document.getElementById('bars'),axis=document.getElementById('axis'),graph=document.getElementById('graph');
  bars.innerHTML='';axis.innerHTML='';
  var old=graph.getElementsByClassName('gridline');while(old.length)graph.removeChild(old[0]);
@@ -66,5 +75,5 @@ function render(){
  else document.getElementById('cheapest').innerHTML='Nog geen 3 aaneengesloten uren beschikbaar';
 }
 function load(){var x=new XMLHttpRequest();x.open('GET','prices.json?t='+new Date().getTime(),true);x.onreadystatechange=function(){if(x.readyState===4){if(x.status===200||x.status===0){try{var d=JSON.parse(x.responseText);if(!d.today||!d.tomorrow)throw Error('Onbekend gegevensformaat');dataset=d;document.getElementById('error').innerHTML='';render();document.getElementById('updated').innerHTML='Bron: Tibber · Gegevens opgehaald '+pad(new Date().getHours())+':'+pad(new Date().getMinutes())+' · Inclusief belastingen en vergoedingen.'}catch(e){document.getElementById('error').innerHTML='Kan prijsgegevens niet verwerken: '+e.message}}else document.getElementById('error').innerHTML='Kan prices.json niet laden (HTTP '+x.status+').'}};x.send()}
-load();setInterval(load,15*60*1000);setInterval(render,60*1000);
+load();setInterval(load,15*60*1000);setInterval(render,60*1000);window.onresize=render;
 </script></body></html>
