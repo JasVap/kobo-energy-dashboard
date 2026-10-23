@@ -5,48 +5,107 @@ on:
     - cron: '7,37 * * * *'
 permissions:
   contents: write
+concurrency:
+  group: tibber-price-update
+  cancel-in-progress: false
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch prices from Tibber
+      - name: Fetch prices from Tibber and forecasts
         env:
           TIBBER_TOKEN: ${{ secrets.TIBBER_TOKEN }}
         run: |
           python3 - <<'PY'
-          import json, os, urllib.request
-          query = '''{ viewer { homes { id currentSubscription { priceInfo { current { total startsAt } today { total startsAt } tomorrow { total startsAt } } } } } }'''
+          import json, os, urllib.request, statistics
+          from datetime import datetime, timezone, timedelta
+
+          def get_json(request):
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          query = '''{ viewer { homes { id currentSubscription { priceInfo { current { total startsAt } today { total startsAt } tomorrow { total startsAt } } } } } } }'''
           request = urllib.request.Request(
               'https://api.tibber.com/v1-beta/gql',
               data=json.dumps({'query': query}).encode('utf-8'),
               headers={'Authorization': 'Bearer ' + os.environ['TIBBER_TOKEN'], 'Content-Type': 'application/json'},
               method='POST')
-          with urllib.request.urlopen(request, timeout=30) as response:
-              result = json.load(response)
+          result = get_json(request)
           if result.get('errors'):
-              raise RuntimeError('Tibber API returned errors: ' + json.dumps(result['errors']))
+              raise RuntimeError('Tibber API errors: ' + json.dumps(result['errors']))
           homes = result.get('data', {}).get('viewer', {}).get('homes', [])
           subscriptions = [h['currentSubscription'] for h in homes if h.get('currentSubscription') and h['currentSubscription'].get('priceInfo')]
           if len(subscriptions) != 1:
-              raise RuntimeError('Expected exactly one home with Tibber price data; found ' + str(len(subscriptions)))
+              raise RuntimeError('Expected exactly one Tibber home; found ' + str(len(subscriptions)))
           info = subscriptions[0]['priceInfo']
+          if not info.get('today') or not info.get('current'):
+              raise RuntimeError('No current or today Tibber price data')
           print('Tibber tarieven vandaag:', len(info.get('today') or []))
           print('Tibber tarieven morgen:', len(info.get('tomorrow') or []))
-          if not info.get('today') or not info.get('current'):
-              raise RuntimeError('No current or today price data available')
+          output = {'current': info['current'], 'today': info['today'],
+                    'tomorrow': info.get('tomorrow') or [], 'forecast': [],
+                    'forecast_adjustment': None, 'forecast_updated_at': None}
+
+          try:
+              forecast_request = urllib.request.Request(
+                  'https://api.energypriceforecast.eu/api/v1/dao/prices?country=nl&hours=48',
+                  headers={'User-Agent': 'Kobo-Wasplanner/1.0'})
+              response = get_json(forecast_request)
+              if response.get('country') != 'NL' or response.get('unit') != 'EUR/kWh':
+                  raise ValueError('Unexpected forecast country or unit')
+              raw = response.get('entries') or []
+              def parse_date(s):
+                  return datetime.fromisoformat(s.replace('Z', '+00:00'))
+              market = [e for e in raw if e.get('source') == 'day_ahead' and isinstance(e.get('value'), (int, float))]
+              actual = [e for e in (info['today'] + (info.get('tomorrow') or [])) if isinstance(e.get('total'), (int, float))]
+              differences = []
+              # Compare each Tibber price with the time-weighted market price for that same interval.
+              for i, item in enumerate(actual):
+                  start = parse_date(item['startsAt'])
+                  end = parse_date(actual[i + 1]['startsAt']) if i + 1 < len(actual) else start + timedelta(hours=1)
+                  if end <= start or end - start > timedelta(hours=1):
+                      continue
+                  covered = 0.0
+                  weighted = 0.0
+                  for entry in market:
+                      a, b = parse_date(entry['start']), parse_date(entry['end'])
+                      overlap = max(0.0, (min(end, b) - max(start, a)).total_seconds())
+                      if overlap:
+                          covered += overlap
+                          weighted += overlap * entry['value']
+                  duration = (end - start).total_seconds()
+                  if covered >= duration - 1:
+                      differences.append(item['total'] - weighted / covered)
+              if not differences:
+                  raise ValueError('No overlapping market and Tibber prices for adjustment')
+              adjustment = statistics.median(differences)
+              output['forecast_adjustment'] = round(adjustment, 6)
+              output['forecast_updated_at'] = response.get('generated_at')
+              for entry in raw:
+                  if entry.get('source') != 'forecast' or not isinstance(entry.get('value'), (int, float)):
+                      continue
+                  if parse_date(entry['end']) <= parse_date(entry['start']):
+                      continue
+                  output['forecast'].append({
+                      'start': entry['start'], 'end': entry['end'],
+                      'total': round(entry['value'] + adjustment, 6),
+                      'market': entry['value']})
+              print('Voorspelde tijdvakken:', len(output['forecast']))
+              print('Indicatieve correctie EUR/kWh:', output['forecast_adjustment'])
+          except Exception as error:
+              print('WAARSCHUWING: voorspelling niet beschikbaar:', str(error))
+
           with open('prices.json', 'w', encoding='utf-8') as file:
-              json.dump({'current': info['current'], 'today': info['today'], 'tomorrow': info.get('tomorrow') or []}, file, ensure_ascii=False, indent=2)
+              json.dump(output, file, ensure_ascii=False, indent=2)
           PY
       - name: Publish updated data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           git add prices.json
-
           if ! git diff --cached --quiet; then
-            git commit -m "Update Tibber prices"
+            git commit -m "Update Tibber prices and forecasts"
             git pull --rebase origin main
             git push origin main
           fi
