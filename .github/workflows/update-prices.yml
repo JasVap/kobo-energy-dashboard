@@ -25,7 +25,7 @@ jobs:
               with urllib.request.urlopen(request, timeout=30) as response:
                   return json.load(response)
 
-          query = '''{ viewer { homes { id currentSubscription { priceInfo { current { total startsAt } today { total startsAt } tomorrow { total startsAt } } } } } } }'''
+          query = '''{ viewer { homes { id currentSubscription { priceInfo { current { total startsAt } today { total startsAt } tomorrow { total startsAt } } } } } }'''
           request = urllib.request.Request(
               'https://api.tibber.com/v1-beta/gql',
               data=json.dumps({'query': query}).encode('utf-8'),
