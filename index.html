@@ -1,15 +1,92 @@
 <!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wasplanner</title><style>
 *{box-sizing:border-box}html,body{margin:0;background:#fff;color:#111;font-family:Arial,sans-serif}body{padding:10px;max-width:760px}.top{border:3px solid #111;padding:8px 10px;min-height:116px}.washer{float:left;width:85px;height:93px;border:4px solid #111;border-radius:7px;text-align:center;margin-right:12px}.washer .dots{font-size:15px;text-align:left;margin:4px 5px}.washer .drum{width:54px;height:54px;border:5px double #111;border-radius:50%;margin:1px auto;font-size:29px;line-height:44px}.kicker{font-size:15px;font-weight:bold;letter-spacing:1px}.moment{font-size:29px;font-weight:bold;margin-top:4px}.cost{font-size:22px;font-weight:bold}.status{font-size:13px;margin-top:3px}.row{margin-top:9px;border-bottom:2px solid #111;padding-bottom:5px}.rowtitle{font-size:16px;font-weight:bold;margin-bottom:4px}.day{display:inline-block;width:32.5%;vertical-align:top;text-align:center;border-right:1px solid #aaa}.day:last-child{border:0}.day strong{display:block;font-size:17px}.day .when{font-size:16px;font-weight:bold}.day .rate{font-size:20px;font-weight:bold}.day .kind{font-size:12px}.chart{height:122px;border-bottom:2px solid #111;position:relative;margin:5px 2px 0}.bar{position:absolute;bottom:0;background:#555}.bar.forecast{background:#bbb;border:1px dashed #444}.bar.best{background:#111}.tick{position:absolute;bottom:-18px;font-size:11px}.legend{font-size:12px;margin-top:22px}.notice{font-size:12px;margin-top:5px}.error{font-size:13px}.clearfix:after{content:"";display:block;clear:both}@media(max-height:620px){body{padding:7px}.top{min-height:101px;padding:5px}.washer{width:72px;height:82px}.washer .drum{width:46px;height:46px;line-height:37px}.moment{font-size:25px}.cost{font-size:19px}.row{margin-top:6px}.chart{height:88px}}
-</style></head><body><div class="top clearfix"><div class="washer"><div class="dots">● ○ ○</div><div class="drum">≈</div></div><div class="kicker">BESTE MOMENT VOOR WAS + DROGER</div><div id="moment" class="moment">Tarieven laden…</div><div id="cost" class="cost"></div><div id="status" class="status">3 uur · start op :00 of :30</div></div><div class="row"><div class="rowtitle">GOEDKOOPSTE 3 UUR PER DAG</div><div id="days"></div></div><div class="rowtitle" style="margin-top:9px">PRIJSVERLOOP 08:00–22:00</div><div class="chart" id="chart"></div><div class="legend">Donker = Tibber definitief · Licht = voorspelling (indien beschikbaar)</div><div class="notice" id="notice">Prijzen inclusief kosten volgens Tibber. Alleen toekomstige startmomenten.</div><div class="error" id="error"></div>
+</style></head><body><div class="top clearfix"><div class="washer"><div class="dots">● ○ ○</div><div class="drum">≈</div></div><div class="kicker">BESTE MOMENT VOOR WAS + DROGER</div><div id="moment" class="moment">Tarieven laden…</div><div id="cost" class="cost"></div><div id="status" class="status">3 uur · start op :00 of :30</div></div><div class="row"><div class="rowtitle">GOEDKOOPSTE 3 UUR PER DAG</div><div id="days"></div></div><div class="rowtitle" style="margin-top:9px">PRIJSVERLOOP 08:00–22:00</div><div class="chart" id="chart"></div><div class="legend">Donker = Tibber definitief · Licht = voorspelling (indien beschikbaar)</div><div class="notice" id="notice">Alleen toekomstige startmomenten; voorspellingen zijn indicatief.</div><div class="error" id="error"></div>
 <script>
 // Oudere Kobo-browser: ES5, geen flexbox, geen externe bibliotheken.
 var DATA=null;function pad(n){return n<10?'0'+n:''+n}function dateKey(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}function clock(d){return pad(d.getHours())+':'+pad(d.getMinutes())}function money(n){return '€ '+n.toFixed(3).replace('.',',')}function dayName(n){return ['Vandaag','Morgen','Overmorgen'][n]}
 function isoMs(s){var m=String(s).match(/^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)(?::(\d\d))?(?:\.\d+)?(Z|([+-])(\d\d):?(\d\d))?$/);if(!m)return NaN;var t=Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0));if(m[7]&&m[7]!=='Z')t-=(m[8]==='+'?1:-1)*(+m[9]*60+ +m[10])*60000;return t}
-function allEntries(){var a=[],src=(DATA.today||[]).concat(DATA.tomorrow||[]),i;for(i=0;i<src.length;i++)if(typeof src[i].total==='number'){var t=isoMs(src[i].startsAt);if(!isNaN(t))a.push({t:t,p:src[i].total,kind:'actual'})}a.sort(function(x,y){return x.t-y.t});return a}
-function valueAt(a,t){for(var i=0;i<a.length;i++){var end=i+1<a.length?a[i+1].t:a[i].t+3600000;if(a[i].t<=t&&t<end&&end-a[i].t<=3600000)return a[i].p}return null}
-function bestFor(a,day,now){var start=new Date(day.getFullYear(),day.getMonth(),day.getDate(),8,0,0).getTime(),end=new Date(day.getFullYear(),day.getMonth(),day.getDate(),22,0,0).getTime(),best=null,t,j,p,sum,valid;for(t=start;t+10800000<=end;t+=1800000){if(t<now)continue;sum=0;valid=true;for(j=0;j<12;j++){p=valueAt(a,t+j*900000);if(p===null){valid=false;break}sum+=p}if(valid&&(!best||sum<best.sum))best={t:t,sum:sum,avg:sum/12}}return best}
-function render(){if(!DATA)return;var now=new Date(),a=allEntries(),days=[],i,b,global=null,html='',d;for(i=0;i<3;i++){d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+i);b=bestFor(a,d,now.getTime());days.push({d:d,b:b});if(b&&(!global||b.avg<global.b.avg))global={d:d,b:b,i:i};html+='<div class="day"><strong>'+dayName(i)+'</strong>'+(b?'<div class="when">'+clock(new Date(b.t))+'–'+clock(new Date(b.t+10800000))+'</div><div class="rate">'+money(b.avg)+'</div><div class="kind">Definitief</div>':'<div class="when">Nog niet bekend</div><div class="kind">Geen betrouwbare tarieven</div>')+'</div>'}document.getElementById('days').innerHTML=html;if(global){document.getElementById('moment').innerHTML=dayName(global.i)+' '+clock(new Date(global.b.t))+'–'+clock(new Date(global.b.t+10800000));document.getElementById('cost').innerHTML=money(global.b.avg)+'/kWh gemiddeld';document.getElementById('status').innerHTML='Definitief Tibber-tarief · 3 aaneengesloten uren'}else{document.getElementById('moment').innerHTML='Geen tijdsblok beschikbaar';document.getElementById('cost').innerHTML='';document.getElementById('status').innerHTML='Wacht op nieuwe tarieven'}
-var chart=document.getElementById('chart');chart.innerHTML='';var points=[],min=999,max=-999,dd,t,price;for(i=0;i<3;i++){dd=days[i].d;for(var h=8;h<22;h++){t=new Date(dd.getFullYear(),dd.getMonth(),dd.getDate(),h,0,0).getTime();price=valueAt(a,t);points.push({t:t,p:price,day:i,h:h});if(price!==null){min=Math.min(min,price);max=Math.max(max,price)}}}if(max<min)return;var w=chart.clientWidth||300,ht=chart.clientHeight||100,step=w/points.length;for(i=0;i<points.length;i++){var item=points[i];if(item.p===null)continue;var el=document.createElement('div');el.className='bar';var barH=10+(item.p-min)/(max-min||1)*(ht-15);el.style.left=Math.round(i*step)+'px';el.style.width=Math.max(2,Math.floor(step)-1)+'px';el.style.height=Math.round(barH)+'px';chart.appendChild(el);if(item.h===8){var lab=document.createElement('span');lab.className='tick';lab.style.left=Math.round(i*step)+'px';lab.innerHTML=dayName(item.day);chart.appendChild(lab)}}document.getElementById('notice').innerHTML='Geen voorspellingen gekoppeld: morgen en overmorgen verschijnen zodra Tibber ze publiceert. Prijzen volgens Tibber.'}
+function allEntries(){
+ var a=[],src=(DATA.today||[]).concat(DATA.tomorrow||[]),i,t;
+ for(i=0;i<src.length;i++)if(typeof src[i].total==='number'){
+  t=isoMs(src[i].startsAt);if(!isNaN(t))a.push({t:t,end:t+3600000,p:src[i].total,kind:'actual'});
+ }
+ // Actual prices take precedence. Forecast intervals may be hourly; never fill gaps.
+ src=DATA.forecast||[];
+ for(i=0;i<src.length;i++)if(typeof src[i].total==='number'){
+  t=isoMs(src[i].start);var end=isoMs(src[i].end);
+  if(!isNaN(t)&&!isNaN(end)&&end>t&&end-t<=3600000)
+   a.push({t:t,end:end,p:src[i].total,kind:'forecast'});
+ }
+ a.sort(function(x,y){if(x.t!==y.t)return x.t-y.t;return x.kind==='actual'?-1:1});return a;
+}
+function valueAt(a,t){
+ var i,found=null;
+ for(i=0;i<a.length;i++)if(a[i].t<=t&&t<a[i].end){
+  if(a[i].kind==='actual')return a[i];found=a[i];
+ }
+ return found;
+}
+function bestFor(a,day,now){
+ var start=new Date(day.getFullYear(),day.getMonth(),day.getDate(),8,0,0).getTime(),
+ end=new Date(day.getFullYear(),day.getMonth(),day.getDate(),22,0,0).getTime();
+ var best=null,t,j,v,sum,valid,predicted;
+ for(t=start;t+10800000<=end;t+=1800000){
+  if(t<now)continue;sum=0;valid=true;predicted=false;
+  for(j=0;j<12;j++){
+   v=valueAt(a,t+j*900000);
+   if(!v||v.end<t+(j+1)*900000){valid=false;break}
+   sum+=v.p;if(v.kind==='forecast')predicted=true;
+  }
+  if(valid&&(!best||sum<best.sum))best={t:t,sum:sum,avg:sum/12,predicted:predicted};
+ }
+ return best;
+}
+function render(){
+ if(!DATA)return;
+ var now=new Date(),a=allEntries(),days=[],i,b,global=null,html='',d;
+ for(i=0;i<3;i++){
+  d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+i);
+  b=bestFor(a,d,now.getTime());days.push({d:d,b:b});
+  if(b&&(!global||b.avg<global.b.avg))global={d:d,b:b,i:i};
+  html+='<div class="day"><strong>'+dayName(i)+'</strong>'+
+   (b?'<div class="when">'+clock(new Date(b.t))+'–'+clock(new Date(b.t+10800000))+'</div><div class="rate">'+money(b.avg)+'</div><div class="kind">'+(b.predicted?'Voorspelling':'Definitief')+'</div>':
+   '<div class="when">Niet beschikbaar</div><div class="kind">Onvoldoende tarieven</div>')+'</div>';
+ }
+ document.getElementById('days').innerHTML=html;
+ if(global){
+  document.getElementById('moment').innerHTML=dayName(global.i)+' '+clock(new Date(global.b.t))+'–'+clock(new Date(global.b.t+10800000));
+  document.getElementById('cost').innerHTML=money(global.b.avg)+'/kWh gemiddeld';
+  document.getElementById('status').innerHTML=(global.b.predicted?'Voorspelling · indicatieve totaalprijs':'Definitief Tibber-tarief')+' · 3 aaneengesloten uren';
+ }else{
+  document.getElementById('moment').innerHTML='Geen tijdsblok beschikbaar';
+  document.getElementById('cost').innerHTML='';document.getElementById('status').innerHTML='Wacht op nieuwe tarieven';
+ }
+ var chart=document.getElementById('chart');chart.innerHTML='';
+ var points=[],min=999,max=-999,dd,t,v,h;
+ for(i=0;i<3;i++){
+  dd=days[i].d;
+  for(h=8;h<22;h++){
+   t=new Date(dd.getFullYear(),dd.getMonth(),dd.getDate(),h,0,0).getTime();
+   v=valueAt(a,t);points.push({t:t,p:v?v.p:null,kind:v?v.kind:'',day:i,h:h});
+   if(v){min=Math.min(min,v.p);max=Math.max(max,v.p)}
+  }
+ }
+ if(max>=min){
+  var w=chart.clientWidth||300,ht=chart.clientHeight||100,step=w/points.length;
+  for(i=0;i<points.length;i++){
+   var item=points[i];if(item.p===null)continue;
+   var el=document.createElement('div');el.className='bar'+(item.kind==='forecast'?' forecast':'');
+   var barH=10+(item.p-min)/(max-min||1)*(ht-15);
+   el.style.left=Math.round(i*step)+'px';el.style.width=Math.max(2,Math.floor(step)-1)+'px';
+   el.style.height=Math.round(barH)+'px';chart.appendChild(el);
+  }
+  for(i=0;i<3;i++){
+   var lab=document.createElement('span');lab.className='tick';
+   lab.style.left=Math.round(i*14*step)+'px';lab.innerHTML=dayName(i);chart.appendChild(lab);
+  }
+ }
+ document.getElementById('notice').innerHTML='Tibber: definitieve totaalprijs. Voorspelling: marktprijs met geschatte correctie; kan afwijken. Ontbrekende uren blijven leeg.';
+}
 function load(){var x=new XMLHttpRequest();x.open('GET','prices.json?v='+new Date().getTime(),true);x.onreadystatechange=function(){if(x.readyState===4){if(x.status===200||x.status===0){try{DATA=JSON.parse(x.responseText);render()}catch(e){document.getElementById('error').innerHTML='Fout in prijsgegevens: '+e.message}}else document.getElementById('error').innerHTML='Kan prices.json niet laden ('+x.status+')'}};x.send()}
 load();
 </script></body></html>
