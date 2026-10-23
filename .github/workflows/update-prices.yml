@@ -31,6 +31,8 @@ jobs:
           if len(subscriptions) != 1:
               raise RuntimeError('Expected exactly one home with Tibber price data; found ' + str(len(subscriptions)))
           info = subscriptions[0]['priceInfo']
+          print('Tibber tarieven vandaag:', len(info.get('today') or []))
+print('Tibber tarieven morgen:', len(info.get('tomorrow') or []))
           if not info.get('today') or not info.get('current'):
               raise RuntimeError('No current or today price data available')
           with open('prices.json', 'w', encoding='utf-8') as file:
