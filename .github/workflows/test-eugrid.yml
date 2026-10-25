@@ -1,4 +1,4 @@
-name: Test EU Grid Model
+name: Test EpexPredictor
 
 on:
   workflow_dispatch:
@@ -9,43 +9,71 @@ jobs:
 
     steps:
       - name: Test Nederlandse prijsvoorspellingen
-        env:
-          API_KEY: ${{ secrets.EUGRIDMODEL_API_KEY }}
         run: |
           python3 - <<'PY'
-          import os
           import json
           import urllib.request
-          import urllib.error
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
 
-          url = "https://eugridmodel.com/v1/forecast/NL"
-          key = os.environ["API_KEY"]
+          url = "https://epexpredictor.batzill.com/prices_short?region=NL"
 
-          print("EU Grid Model API testen...")
-          print("Land: Nederland (NL)")
+          print("=== EpexPredictor API-test ===")
 
           request = urllib.request.Request(
               url,
               headers={
-                  "Authorization": f"Bearer {key}",
-                  "Accept": "application/json"
+                  "Accept": "application/json",
+                  "User-Agent": "KoboEnergyDashboard/1.0"
               }
           )
 
-          try:
-              with urllib.request.urlopen(request, timeout=30) as response:
-                  data = json.load(response)
+          with urllib.request.urlopen(request, timeout=30) as response:
+              data = json.load(response)
 
-              print("VERBINDING GESLAAGD")
-              print("Ontvangen gegevens:")
-              print(json.dumps(data, indent=2)[:5000])
+          timestamps = data["s"]
+          prices = data["t"]
 
-          except urllib.error.HTTPError as e:
-              print(f"HTTP-fout: {e.code}")
-              print(e.read().decode()[:1000])
-              raise
+          assert len(timestamps) == len(prices), "Aantal tijdstippen en prijzen verschilt"
+          assert len(timestamps) > 0, "Geen prijsgegevens ontvangen"
 
-          except Exception as e:
-              print(f"FOUT: {e}")
-              raise
+          print("VERBINDING GESLAAGD")
+          print(f"Aantal prijsgegevens: {len(prices)}")
+
+          timezone = ZoneInfo("Europe/Amsterdam")
+          now = datetime.now(timezone)
+          day_after_tomorrow = now.date() + timedelta(days=2)
+
+          dates = [
+              datetime.fromtimestamp(ts, timezone).date()
+              for ts in timestamps
+          ]
+
+          print(f"Eerste tijdstip: {datetime.fromtimestamp(timestamps[0], timezone)}")
+          print(f"Laatste tijdstip: {datetime.fromtimestamp(timestamps[-1], timezone)}")
+          print(f"Eerste prijswaarde: {prices[0]}")
+          print(f"Laatste prijswaarde: {prices[-1]}")
+
+          count = sum(
+              1 for date in dates
+              if date == day_after_tomorrow
+          )
+
+          print(f"Prijsgegevens voor overmorgen ({day_after_tomorrow}): {count}")
+
+          if count > 0:
+              print("OVERMORGEN: GEGEVENS BESCHIKBAAR")
+          else:
+              print("OVERMORGEN: GEEN GEGEVENS")
+
+          intervals = [
+              timestamps[i + 1] - timestamps[i]
+              for i in range(len(timestamps) - 1)
+          ]
+
+          print(f"Tijdstap in seconden: {sorted(set(intervals))}")
+
+          assert count > 0, "Geen prijsgegevens voor overmorgen"
+
+          print("=== TEST GESLAAGD ===")
           PY
